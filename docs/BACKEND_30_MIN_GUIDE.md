@@ -4,15 +4,15 @@ You do not need to memorize every line. Learn where data lives, how a request re
 
 ## Minutes 0–5: the big picture
 
-The backend implements two modules: **Professor & Course Management** and **Student Authentication & Anonymous Identity**. Reviews, reports, votes, and analytics are not persisted yet.
+The backend implements three modules: **Professor & Course Management** and **Student Authentication & Anonymous Identity**, plus **Rating & Review Submission**. Reports, votes, and analytics remain future work.
 
 Three programs run locally:
 
-| Program | Port | Job |
-|---|---:|---|
-| React through Vite | 5173 | Displays forms and catalog pages |
-| Node.js + Express | 3000 | Receives requests, checks rules, runs SQL |
-| MySQL | 3307 | Stores persistent rows |
+| Program            | Port | Job                                       |
+| ------------------ | ---: | ----------------------------------------- |
+| React through Vite | 5173 | Displays forms and catalog pages          |
+| Node.js + Express  | 3000 | Receives requests, checks rules, runs SQL |
+| MySQL              | 3307 | Stores persistent rows                    |
 
 ```text
 React sends a request
@@ -32,24 +32,25 @@ Vite forwards requests beginning with `/api` to Express. React does not connect 
 
 Two kinds of storage matter:
 
-- **MySQL:** accounts, catalog records, teaching assignments, sessions, and password-recovery records. These survive a browser refresh.
-- **React memory:** search text, selected tabs, and review/report/vote previews. These reset on a full page reload.
+- **MySQL:** accounts, catalog records, teaching assignments, saved reviews, sessions, and password-recovery records. These survive a browser refresh.
+- **React memory:** search text, selected tabs, and report/vote previews. These reset on a full page reload.
 
 The official curriculum JavaScript file is a source for seeding/importing courses. It is not the live database. Editing it alone does not update existing SQL rows.
 
 ## Minutes 5–10: the database
 
-Read [schema.sql](/Users/naman/rate-your-prof/server/schema.sql). It defines seven tables:
+Read [schema.sql](/Users/naman/rate-your-prof/server/schema.sql). It defines eight tables:
 
-| Table | What one row represents |
-|---|---|
-| departments | One department |
-| professors | One professor, with a department ID |
-| courses | One course, with a department ID |
-| professor_courses | One professor teaching one course |
-| users | One student or website admin account |
-| sessions | One browser session |
-| password_resets | One account's current recovery-code record |
+| Table             | What one row represents                                       |
+| ----------------- | ------------------------------------------------------------- |
+| departments       | One department                                                |
+| professors        | One professor, with a department ID                           |
+| courses           | One course, with a department ID                              |
+| professor_courses | One professor teaching one course                             |
+| users             | One student or website admin account                          |
+| sessions          | One browser session                                           |
+| password_resets   | One account's current recovery-code record                    |
+| reviews           | One anonymous saved review, with a private unique context key |
 
 ### Relationships
 
@@ -78,13 +79,13 @@ id              unique account UUID
 email           normalized email
 password_hash   scrypt encoding; no plaintext password
 role            student or admin
-anonymous_seed  private random value for future review identities
+anonymous_seed  private random value for anonymous review identities
 session_version number used to invalidate old logins
 ```
 
 Website users are rows in `users`. The MySQL username/password in `.env` belongs to the backend's database connection. They are separate accounts.
 
-The professor catalog currently starts empty. The seed supplies 101 official CS-coded courses and no reviews.
+The seed supplies the checked-in official NITW faculty/departments and B.Tech course snapshot, including verified teaching links. It adds no sample reviews. Source caveats are in NITW_CATALOG.md.
 
 ## Minutes 10–15: catalog reads and admin edits
 
@@ -204,11 +205,11 @@ Logout deletes the current browser's session and clears its cookie.
 
 These are three different checks:
 
-| Check | Question answered |
-|---|---|
-| Authentication | Is this a valid signed-in account? |
-| Authorization | Is that account allowed to perform this action? |
-| CSRF token | Does the mutation carry the token belonging to this session? |
+| Check          | Question answered                                            |
+| -------------- | ------------------------------------------------------------ |
+| Authentication | Is this a valid signed-in account?                           |
+| Authorization  | Is that account allowed to perform this action?              |
+| CSRF token     | Does the mutation carry the token belonging to this session? |
 
 Admin catalog edits require an admin role loaded from MySQL. React hiding an admin button is not sufficient protection.
 
@@ -231,7 +232,7 @@ A valid reset changes the password hash, deletes the code, and increments `sessi
 
 The attempt counter matters: a wrong guess must commit its counter increase before an error is returned. Otherwise rollback would erase the failed attempt.
 
-### Future anonymous reviews
+### Anonymous reviews
 
 The backend can calculate a private keyed hash from:
 
@@ -241,27 +242,27 @@ account's private seed + professor ID + course ID
 
 The same account/context gives the same key. Another professor/course gives another key. The key is not returned by the eligibility API.
 
-Module 3 will use this foundation to enforce one review per account/context. That uniqueness constraint and persistent review submission are not implemented yet. The current eligibility check confirms a teaching link, not whether the student attended the course.
+Module 3 now uses this key in a MySQL UNIQUE constraint. The server validates ratings/text/tags/semester/confirmation, checks the teaching link, and inserts the review transactionally. Concurrent duplicate submissions return 409. Public responses omit the private key and account details. The current eligibility check confirms a teaching link, not whether the student attended the course.
 
 ## Minutes 26–30: connect the files and check understanding
 
 The remaining files support the flows you just learned:
 
-| File/group | Responsibility |
-|---|---|
-| index.js | Start API, check database access, prune expired sessions, shut down cleanly |
-| app.js | Assemble middleware, request limits, sessions, routes, and error handling |
-| config.js | Read/validate backend-only environment settings |
-| lib/validation.js | Validate and normalize incoming values |
-| lib/security.js | Hash passwords, generate secrets/codes, derive keyed hashes |
-| lib/errors.js | Translate failures into consistent JSON/status codes |
-| lib/mail.js | Deliver recovery messages through files or SMTP |
-| scripts/setup-local.js | Provision the isolated local database and website admin |
-| scripts/migrate.js + migrations/ | Create/upgrade tables without rebuilding account data |
-| scripts/seed.js | Insert missing initial departments/courses without overwriting edits |
-| scripts/import-curriculum.js | Explicitly replace courses with the official list, with a backup |
-| scripts/create-admin.js | Create an admin through an administrative command |
-| tests/ | Check success, rejection, transactions, sessions, and migrations using test data |
+| File/group                                       | Responsibility                                                                   |
+| ------------------------------------------------ | -------------------------------------------------------------------------------- |
+| index.js                                         | Start API, check database access, prune expired sessions, shut down cleanly      |
+| app.js                                           | Assemble middleware, request limits, sessions, routes, and error handling        |
+| config.js                                        | Read/validate backend-only environment settings                                  |
+| lib/validation.js                                | Validate and normalize incoming values                                           |
+| lib/security.js                                  | Hash passwords, generate secrets/codes, derive keyed hashes                      |
+| lib/errors.js                                    | Translate failures into consistent JSON/status codes                             |
+| lib/mail.js                                      | Deliver recovery messages through files or SMTP                                  |
+| scripts/setup-local.js                           | Provision the isolated local database and website admin                          |
+| scripts/migrate.js + migrations/                 | Create/upgrade tables without rebuilding account data                            |
+| scripts/seed.js                                  | Insert missing initial departments/courses without overwriting edits             |
+| scripts/collect-nitw.js + scripts/import-nitw.js | Collect/verify official sources, then safely import with a backup                |
+| scripts/create-admin.js                          | Create an admin through an administrative command                                |
+| tests/                                           | Check success, rejection, transactions, sessions, and migrations using test data |
 
 The backend's `.env` contains its database credentials and separate session, recovery, and anonymous-identity secrets. These are not included in the frontend bundle.
 
@@ -287,6 +288,6 @@ You understand the main implementation if you can answer:
 6. How does resetting a password invalidate older logins?
 7. Which data currently disappears on refresh?
 
-Answers: Express enforces rules and keeps database credentials private; the table stores teaching pairs; edits and links must succeed together; hashing avoids storing readable passwords; the cookie identifies a server-side session row; the account version increases; React-only state including review/report/vote previews disappears on full reload.
+Answers: Express enforces rules and keeps database credentials private; the table stores teaching pairs; edits and links must succeed together; hashing avoids storing readable passwords; the cookie identifies a server-side session row; the account version increases; React-only state including report/vote previews disappears on full reload.
 
 For reference while reading, use [PROJECT_CODE_GUIDE.md](PROJECT_CODE_GUIDE.md). The longer [BACKEND_CODE_GUIDE.md](BACKEND_CODE_GUIDE.md) is optional when you want to inspect a particular operation in detail.

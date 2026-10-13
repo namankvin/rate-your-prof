@@ -31,7 +31,7 @@ export default function Information({ type }) {
             [
               "shield",
               "Your voice. Your privacy.",
-              "Student accounts keep names and emails out of public review previews. Institutional identity verification will be added later.",
+              "Student accounts keep names and emails out of public reviews. Institutional identity verification will be added later.",
             ],
             [
               "users",
@@ -55,10 +55,10 @@ export default function Information({ type }) {
             RateMyProf is an independent student project inspired by campus life
             at NIT Warangal. The React frontend is connected to a Node.js,
             Express, and MySQL backend for catalog management and account
-            registration and login. Professor seed profiles are fictional
-            examples. Courses come from the NITW CSE curriculum, and reviews
-            start empty. The project is not affiliated with or endorsed by the
-            institution.
+            registration, login, and anonymous review submission. Faculty and
+            departments come from official NITW rosters; courses come from the
+            published B.Tech curricula. No sample reviews are added. The project
+            is not affiliated with or endorsed by the institution.
           </p>
           <Link className="text-link" to="/guidelines">
             Explore our community principles <Icon name="arrow" size={17} />
@@ -71,7 +71,7 @@ export default function Information({ type }) {
     ? [
         [
           "What this project stores",
-          "Catalog records, registered accounts, password hashes, password recovery records, and login sessions are stored in MySQL. Review previews, helpful votes, and reports remain temporary frontend state and reset on refresh. Passwords are hashed on the server rather than stored as readable text.",
+          "Catalog records, registered accounts, password hashes, password recovery records, and login sessions are stored in MySQL. Reviews are saved in MySQL. Helpful votes and reports remain temporary frontend previews and reset on refresh. Passwords are hashed on the server rather than stored as readable text.",
         ],
         [
           "What is public",
@@ -79,7 +79,7 @@ export default function Information({ type }) {
         ],
         [
           "Accounts without public identity",
-          "Registration currently requires an approved student email and password, with no email verification code. Google OAuth is planned for later. A private, server-generated identity is available for future anonymous review submission. Account information and private identity fields are not returned by public catalog APIs. This provides a foundation for pseudonymous reviews, not anonymity from the server operator.",
+          "Registration currently requires an approved student email and password, with no email verification code. Google OAuth is planned for later. A private, server-generated identity enforces one anonymous review per account, professor, and course. Account information and private identity fields are not returned by public catalog APIs. This provides a foundation for pseudonymous reviews, not anonymity from the server operator.",
         ],
         [
           "Protecting small groups",

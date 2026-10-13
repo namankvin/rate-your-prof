@@ -92,7 +92,7 @@ export default function Profile({ id, type, reviewsOnly = false }) {
         <div className="profile-info">
           <div className="eyebrow">
             {isCourse
-              ? `${item.code} · ${item.credits} CREDITS`
+              ? `${item.code} · ${item.credits === null ? "CREDITS NOT SPECIFIED" : `${item.credits} CREDITS`}`
               : item.designation}
           </div>
           <h1>{item.name}</h1>
@@ -108,8 +108,14 @@ export default function Profile({ id, type, reviewsOnly = false }) {
           )}
         </div>
         <div className="rating-summary">
-          <strong>Not rated</strong>
-          <span className="muted small">No reviews yet</span>
+          <strong>
+            {itemReviews.length ? item.rating.toFixed(1) + " / 5" : "Not rated"}
+          </strong>
+          <span className="muted small">
+            {itemReviews.length
+              ? `${itemReviews.length} review${itemReviews.length === 1 ? "" : "s"}`
+              : "No reviews yet"}
+          </span>
         </div>
         <Link to={writeLink} className="button primary">
           <Icon name="edit" size={17} />
@@ -130,6 +136,16 @@ export default function Profile({ id, type, reviewsOnly = false }) {
                 <p className="body-copy">
                   {isCourse ? item.description : item.bio}
                 </p>
+                {item.sourceUrl && (
+                  <a
+                    href={item.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-link"
+                  >
+                    Official NITW source <Icon name="arrow" size={15} />
+                  </a>
+                )}
               </section>
               <section className="panel">
                 <h3>
@@ -184,7 +200,7 @@ function RelatedList({ items, isCourse }) {
               <span>
                 {isCourse
                   ? item.department
-                  : `${item.code} · ${item.credits} credits`}
+                  : `${item.code} · ${item.credits === null ? "Credits not specified" : `${item.credits} credits`}`}
               </span>
             </div>
             <Icon name="chevron" size={17} />

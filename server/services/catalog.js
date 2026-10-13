@@ -48,6 +48,7 @@ export function createCatalogService(pool) {
         name: row.name,
         department: row.department,
         departmentId: row.department_id,
+        sourceUrl: row.source_url,
       };
       if (professor)
         return {
@@ -59,7 +60,7 @@ export function createCatalogService(pool) {
             .filter((link) => link.professor_id === row.id)
             .map((link) => link.course_id),
           initials: row.name
-            .replace(/^Dr\.\s*/i, "")
+            .replace(/^(Professor|Prof|Dr)\.?\s*/i, "")
             .split(" ")
             .filter(Boolean)
             .map((n) => n[0])
@@ -70,7 +71,7 @@ export function createCatalogService(pool) {
       return {
         ...common,
         code: row.code,
-        credits: Number(row.credits),
+        credits: row.credits === null ? null : Number(row.credits),
         semester: row.semester,
         description: row.description,
       };
@@ -110,13 +111,7 @@ export function createCatalogService(pool) {
       }
       const department = await departmentId(connection, body.department);
       if (kind === "professors") {
-        const designation = text(body.designation, "Designation", 50);
-        requireValue(
-          ["Professor", "Associate Professor", "Assistant Professor"].includes(
-            designation,
-          ),
-          "Choose a valid designation.",
-        );
+        const designation = text(body.designation, "Designation", 120);
         requireValue(
           Array.isArray(body.courses) && body.courses.length <= 100,
           "Courses must be a list of at most 100 course IDs.",
@@ -160,14 +155,16 @@ export function createCatalogService(pool) {
           );
       } else {
         requireValue(
-          Number.isFinite(body.credits) &&
-            Number.isInteger(body.credits * 2) &&
-            body.credits >= 0.5 &&
-            body.credits <= 10,
-          "Credits must be from 0.5 to 10 in half-credit increments.",
+          body.credits === null ||
+            (Number.isFinite(body.credits) &&
+              Number.isInteger(body.credits * 2) &&
+              body.credits >= 0 &&
+              body.credits <= 10),
+          "Credits must be unknown or from 0 to 10 in half-credit increments.",
         );
         requireValue(
-          /^Semester [1-8]( or [1-8])?$/.test(body.semester),
+          body.semester === "Not specified" ||
+            /^Semester [1-8]( or [1-8])?$/.test(body.semester),
           "Choose a semester from 1 to 8.",
         );
         const values = [

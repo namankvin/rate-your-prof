@@ -19,6 +19,7 @@ export default function Directory({ type, params }) {
     params.get("department") || "All Departments",
   );
   const [view, setView] = useState("list");
+  const [visibleCount, setVisibleCount] = useState(24);
   const results = (isCourse ? courses : professors)
     .filter((item) => {
       const courseNames = !isCourse
@@ -49,7 +50,10 @@ export default function Directory({ type, params }) {
       <div className="directory-tools">
         <SearchInput
           value={query}
-          onChange={setQuery}
+          onChange={(value) => {
+            setQuery(value);
+            setVisibleCount(24);
+          }}
           placeholder={
             isCourse
               ? "Search by course name, code, or department..."
@@ -70,7 +74,10 @@ export default function Directory({ type, params }) {
             : departments
         }
         value={department}
-        onChange={setDepartment}
+        onChange={(value) => {
+          setDepartment(value);
+          setVisibleCount(24);
+        }}
       />
       <div className="results-heading">
         <span>
@@ -128,7 +135,7 @@ export default function Directory({ type, params }) {
         </EmptyState>
       ) : isCourse ? (
         <div className="course-grid">
-          {results.map((c) => (
+          {results.slice(0, visibleCount).map((c) => (
             <article className="course-card panel" key={c.id}>
               <div className="section-heading">
                 <span className="course-icon">
@@ -136,7 +143,13 @@ export default function Directory({ type, params }) {
                 </span>
               </div>
               <div className="course-code">
-                {c.code} <span>· {c.credits} credits</span>
+                {c.code}{" "}
+                <span>
+                  ·{" "}
+                  {c.credits === null
+                    ? "Credits not specified"
+                    : `${c.credits} credits`}
+                </span>
               </div>
               <h3>
                 <Link to={`/courses/${c.id}`}>{c.name}</Link>
@@ -145,7 +158,11 @@ export default function Directory({ type, params }) {
                 {c.department} · {c.semester}
               </p>
               <div className="card-bottom">
-                <span>No reviews yet</span>
+                <span>
+                  {c.reviewCount
+                    ? `${c.reviewCount} review${c.reviewCount === 1 ? "" : "s"}`
+                    : "No reviews yet"}
+                </span>
                 <Link className="text-link" to={`/courses/${c.id}`}>
                   Explore course <Icon name="arrow" size={16} />
                 </Link>
@@ -155,7 +172,7 @@ export default function Directory({ type, params }) {
         </div>
       ) : view === "grid" ? (
         <div className="professor-grid">
-          {results.map((p) => (
+          {results.slice(0, visibleCount).map((p) => (
             <ProfessorCard key={p.id} professor={p} />
           ))}
         </div>
@@ -174,7 +191,7 @@ export default function Directory({ type, params }) {
               </tr>
             </thead>
             <tbody>
-              {results.map((p) => (
+              {results.slice(0, visibleCount).map((p) => (
                 <tr key={p.id}>
                   <td>
                     <Link className="table-person" to={`/professors/${p.id}`}>
@@ -189,9 +206,13 @@ export default function Directory({ type, params }) {
                     <span className="department-label">{p.department}</span>
                   </td>
                   <td>
-                    <span className="muted">Not rated</span>
+                    <span className="muted">
+                      {p.rating === null
+                        ? "Not rated"
+                        : `${p.rating.toFixed(1)} / 5`}
+                    </span>
                   </td>
-                  <td className="muted">0</td>
+                  <td className="muted">{p.reviewCount}</td>
                   <td>
                     <Link
                       className="icon-button"
@@ -205,6 +226,17 @@ export default function Directory({ type, params }) {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+      {visibleCount < results.length && (
+        <div className="directory-more">
+          <button
+            className="button secondary"
+            onClick={() => setVisibleCount((count) => count + 24)}
+          >
+            Show more ({Math.min(visibleCount, results.length)} of{" "}
+            {results.length})
+          </button>
         </div>
       )}
       <div className="directory-note">

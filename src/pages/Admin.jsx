@@ -26,7 +26,6 @@ export default function Admin({ section = "overview" }) {
     deleteCatalog,
     courses,
     reviews,
-    setReviews,
     reports,
     setReports,
   } = useData();
@@ -54,7 +53,7 @@ export default function Admin({ section = "overview" }) {
           name: values.name,
           department: values.department,
           code: values.code,
-          credits: Number(values.credits),
+          credits: values.credits === "" ? null : Number(values.credits),
           semester: values.semester,
           description: values.description,
         }
@@ -99,19 +98,9 @@ export default function Admin({ section = "overview" }) {
           : r,
       ),
     );
-    if (action === "remove") {
-      setReviews((prev) => prev.filter((r) => r.id !== report.reviewId));
-      setReports((prev) =>
-        prev.map((r) =>
-          r.reviewId === report.reviewId && r.status === "Pending"
-            ? { ...r, status: "Removed" }
-            : r,
-        ),
-      );
-    }
     setFeedback(
       action === "remove"
-        ? "Review removed from this preview."
+        ? "Removal preview recorded. Persistent moderation belongs to Module 5."
         : "Report dismissed in this preview.",
     );
   }
@@ -126,8 +115,8 @@ export default function Admin({ section = "overview" }) {
         <Icon name="info" size={18} />
         <span>
           Catalog changes are saved in MySQL. This workspace requires an
-          authenticated administrator account. Reviews and moderation remain
-          previews for later modules.
+          authenticated administrator account. Reviews are saved in MySQL.
+          Moderation remains a preview for Module 5.
         </span>
       </div>
       <div className="admin-layout">
@@ -449,11 +438,10 @@ export default function Admin({ section = "overview" }) {
                     <input
                       name="credits"
                       type="number"
-                      min={0.5}
+                      min={0}
                       step={0.5}
                       max={10}
-                      required
-                      defaultValue={editing.credits || 3}
+                      defaultValue={editing.credits ?? ""}
                     />
                   </label>
                 </div>
@@ -468,6 +456,7 @@ export default function Admin({ section = "overview" }) {
                       <option key={i}>Semester {i + 1}</option>
                     ))}
                     <option>Semester 7 or 8</option>
+                    <option>Not specified</option>
                   </select>
                 </label>
                 <label>
@@ -492,6 +481,14 @@ export default function Admin({ section = "overview" }) {
                     name="designation"
                     defaultValue={editing.designation || "Assistant Professor"}
                   >
+                    {editing.designation &&
+                      ![
+                        "Professor",
+                        "Associate Professor",
+                        "Assistant Professor",
+                      ].includes(editing.designation) && (
+                        <option>{editing.designation}</option>
+                      )}
                     {[
                       "Professor",
                       "Associate Professor",

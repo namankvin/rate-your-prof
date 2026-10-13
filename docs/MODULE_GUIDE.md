@@ -1,56 +1,16 @@
-# Module implementation status
+# Six modules and current status
 
-Start with [BACKEND_30_MIN_GUIDE.md](BACKEND_30_MIN_GUIDE.md) for a short explanation of the implemented backend and data flows.
+| #   | Module                                      | Status                                                                                                                                         |
+| --- | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Professor & Course Management               | Implemented: official catalog, source audit/import scripts, search, admin CRUD, verified teaching links                                        |
+| 2   | Student Authentication & Anonymous Identity | Implemented: password accounts, sessions/recovery, private identity helper; Google OAuth deferred                                              |
+| 3   | Rating & Review Submission                  | Implemented: persistent anonymous reviews, six validated ratings, semester/text/tags/confirmation, unique account/professor/course key         |
+| 4   | Professor Rating & Student Discovery        | Basic saved-review display and simple frontend summaries exist; advanced filtering, breakdowns, pagination APIs, and privacy thresholds remain |
+| 5   | Moderation, Reporting & Trust               | Frontend report/moderation previews only; persistent reports, abuse checks, moderation states, and audit trail remain                          |
+| 6   | Analytics, Insights & Administration        | Planned; Insights blank, comparison removed, helpful votes remain previews                                                                     |
 
-For the backend source walkthrough and data flows, read [BACKEND_CODE_GUIDE.md](BACKEND_CODE_GUIDE.md).
+Module 1 defines what can be reviewed. Module 2 identifies participating accounts. Module 3 saves feedback. Module 4 makes feedback useful. Module 5 maintains trust. Module 6 provides higher-level insights.
 
-Read [PROJECT_CODE_GUIDE.md](PROJECT_CODE_GUIDE.md) for the full frontend/backend explanation and learning sequence.
+Read [BACKEND_30_MIN_GUIDE.md](BACKEND_30_MIN_GUIDE.md) for the data flows, [PROJECT_CODE_GUIDE.md](PROJECT_CODE_GUIDE.md) for the file map, and [NITW_CATALOG.md](NITW_CATALOG.md) for source coverage and limitations.
 
-## Module 1: Professor & Course Management — implemented
-
-- MySQL tables for departments, professors, courses, and teaching relationships.
-- Professor catalog starts empty; no professor names are seeded.
-- 101 CS-coded courses from the supplied AY 2024-25 curriculum; no non-CSE courses or sample reviews.
-- Half-credit migration and source-backed catalog importer with private backup.
-- Public catalog/list/detail APIs with search and department/course filters.
-- Server-validated administrator CRUD, including department management.
-- Transactional teaching assignments; foreign-key constraints.
-- React directories, profiles, filters, and admin forms connected to MySQL.
-- Loading, connection-error, retry, validation, and authorization feedback.
-
-Start reading `server/schema.sql`, `server/services/catalog.js`, `server/routes/catalog.js`, `src/context/DataContext.jsx`, and `src/pages/Admin.jsx`.
-
-## Module 2: Student Authentication & Anonymous Identity — implemented
-
-- Registration limited to `student.nitw.ac.in`, canonical email uniqueness, and alias checks.
-- Signup/login use email and password without a verification code. Existing pending accounts can sign in; duplicate signup offers sign-in instead.
-- Password recovery retains random reset codes, ten-minute expiry, five wrong attempts, and resend cooldown.
-- Salted password hashing using Node’s built-in scrypt.
-- Login, logout, and password reset. Google OAuth is planned for later; inbox ownership is not checked during signup.
-- MySQL-backed HttpOnly cookie sessions with login regeneration.
-- Password reset invalidates sessions on all devices through a version counter.
-- Server-side administrator authorization and frontend access gates.
-- A private per-user seed and keyed per-professor/course review identity helper.
-- SMTP delivery support; current local configuration saves mail privately to `.local/mail/`.
-
-Start reading `server/services/auth.js`, `server/lib/security.js`, `server/middleware/auth.js`, `src/context/AuthContext.jsx`, and `src/pages/Auth.jsx`.
-
-## Module 3: Rating & Review Submission — frontend preview, next to implement
-
-The review form validates ratings/tags and calls the real signed-in-account eligibility API. Submission still changes temporary frontend state only. Next, add a reviews table and submission API, use the private identity helper server-side, enforce a unique context key, and implement server-side review validation. Do not expose private identity keys or student identity in public review responses.
-
-## Module 4: Professor Rating & Student Discovery — frontend preview
-
-Profiles, review filters, and discovery screens exist. Catalog information is real MySQL data, but reviews start empty and no sample ratings are displayed. Add real aggregates, pagination, tag counts, and course-specific ratings after Module 3.
-
-## Module 5: Moderation, Reporting & Trust — frontend preview
-
-Report dialogs and the protected moderation screen exist. Reports and moderation decisions remain in-memory previews. Add persistent reports, moderation states, abuse checks, privacy thresholds, and audit logs.
-
-## Module 6: Analytics, Insights & Administration — planned (blank page)
-
-Insights is blank and professor comparison is removed from the frontend for now. Add real semester/department aggregates and helpful-vote persistence. Protect small cohorts and keep private account data out of analytics.
-
-## Intended responsibility boundaries
-
-Module 1 defines **what** can be reviewed. Module 2 defines **who** can participate. Module 3 collects feedback. Module 4 presents it. Module 5 maintains trust. Module 6 provides aggregated insights.
+Module 3's private context key is generated on the server using the account's private seed and professor/course IDs. A database UNIQUE constraint rejects concurrent duplicates, including across semesters. Public review responses contain no account identity or private key. Domain-only password registration does not prove mailbox ownership; Google OAuth remains separate work.

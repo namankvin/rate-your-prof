@@ -25,7 +25,7 @@ export function errorHandler(error, req, res, next) {
     return res.status(409).json({
       error: {
         message:
-          "Move or remove this department’s professors and courses before deleting it.",
+          "This record is still referenced by catalog entries or reviews. Remove its dependencies before deleting it.",
         code: "IN_USE",
       },
     });

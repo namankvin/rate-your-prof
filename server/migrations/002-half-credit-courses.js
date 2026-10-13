@@ -12,7 +12,11 @@ export async function allowHalfCredits(pool) {
   );
   if (
     columns[0]?.DATA_TYPE === "decimal" &&
-    creditChecks.some((check) => check.CHECK_CLAUSE.includes("0.5"))
+    creditChecks.some(
+      (check) =>
+        check.CHECK_CLAUSE.includes("0.5") ||
+        /between\s+0\s+and\s+10/i.test(check.CHECK_CLAUSE),
+    )
   )
     return;
   const drops = creditChecks.map(

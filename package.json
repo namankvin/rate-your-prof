@@ -15,9 +15,10 @@
     "db:seed": "node server/scripts/seed.js",
     "admin:create": "node server/scripts/create-admin.js",
     "setup:local": "node server/scripts/setup-local.js",
-    "test": "node --test server/tests/unit.test.js",
+    "test": "node --test server/tests/unit.test.js server/tests/catalog.test.js",
     "test:integration": "node --test --test-concurrency=1 server/tests/integration.test.js",
-    "catalog:import": "node server/scripts/import-curriculum.js"
+    "catalog:collect": "node server/scripts/collect-nitw.js",
+    "catalog:sync": "node server/scripts/import-nitw.js"
   },
   "dependencies": {
     "dotenv": "^17.2.0",
@@ -31,6 +32,7 @@
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
+    "playwright": "^1.62.1",
     "vite": "^7.1.0"
   }
 }

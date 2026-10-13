@@ -2,6 +2,7 @@ import { Avatar, Link } from "./UI.jsx";
 import Icon from "./Icon.jsx";
 
 export default function ProfessorCard({ professor }) {
+  const count = professor.reviewCount;
   return (
     <article className="professor-card">
       <div className="card-person">
@@ -14,7 +15,11 @@ export default function ProfessorCard({ professor }) {
         </div>
       </div>
       <div className="card-bottom">
-        <span>No reviews yet</span>
+        <span>
+          {count
+            ? `${count} review${count === 1 ? "" : "s"}`
+            : "No reviews yet"}
+        </span>
         <Link to={`/professors/${professor.id}`} className="text-link">
           View profile <Icon name="arrow" size={16} />
         </Link>

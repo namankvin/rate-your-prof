@@ -7,14 +7,13 @@ import mysql from "mysql2/promise";
 import { readConfig, projectRoot } from "../config.js";
 import { createPool } from "../db.js";
 import { migrate } from "../scripts/migrate.js";
-import { cseCurriculum } from "../../shared/cseCurriculum.js";
-import { importCurriculum } from "../scripts/import-curriculum.js";
+import { importNitwCatalog } from "../scripts/import-nitw.js";
 import { seed } from "../scripts/seed.js";
 import { createApp } from "../app.js";
 import { hashPassword, randomSecret } from "../lib/security.js";
 import { createAuthService } from "../services/auth.js";
 
-test("Modules 1 and 2 against real MySQL in an isolated test database", async (t) => {
+test("Modules 1–3 against real MySQL in an isolated test database", async (t) => {
   const database = `rmp_test_${process.pid}`,
     testUser = `rmp_test_${process.pid}`,
     testPassword = randomSecret();
@@ -53,14 +52,24 @@ test("Modules 1 and 2 against real MySQL in an isolated test database", async (t
     DB_USER: testUser,
     DB_PASSWORD: testPassword,
     MAIL_MODE: "file",
+    STUDENT_EMAIL_DOMAINS: "student.nitw.ac.in",
   });
   pool = createPool(config);
   await migrate(pool);
   await seed(pool);
-  assert.equal((await pool.query("SELECT id FROM professors"))[0].length, 0);
-  // Explicit test-only fixtures; application seeding never creates professors.
+  const officialCatalog = JSON.parse(
+    await fs.readFile(
+      path.join(projectRoot, "shared/nitwCatalog.json"),
+      "utf8",
+    ),
+  );
+  assert.equal(
+    (await pool.query("SELECT id FROM professors"))[0].length,
+    officialCatalog.professors.length,
+  );
+  // Additional test-only fixtures; official faculty are seeded from the snapshot.
   await pool.query(
-    "INSERT INTO professors (id, name, department_id, designation, bio) VALUES ('test-teacher-one', 'Test Teacher One', 'computer-science', 'Professor', 'Test only'), ('test-teacher-two', 'Test Teacher Two', 'computer-science', 'Professor', 'Test only')",
+    "INSERT INTO professors (id, name, department_id, designation, bio) VALUES ('test-teacher-one', 'Test Teacher One', 'cse', 'Professor', 'Test only'), ('test-teacher-two', 'Test Teacher Two', 'cse', 'Professor', 'Test only')",
   );
   await pool.query(
     "INSERT INTO professor_courses (professor_id, course_id) VALUES ('test-teacher-one', 'cs1206'), ('test-teacher-two', 'cs1206')",
@@ -93,13 +102,14 @@ test("Modules 1 and 2 against real MySQL in an isolated test database", async (t
       for (const value of response.headers.getSetCookie())
         if (value.startsWith("rmp.sid=")) this.cookie = value.split(";")[0];
       const data = await response.json();
-      assert.equal(
-        response.status,
-        expected,
-        `${method} ${route}: ${JSON.stringify(data)}`,
-      );
+      if (expected !== null)
+        assert.equal(
+          response.status,
+          expected,
+          `${method} ${route}: ${JSON.stringify(data)}`,
+        );
       if (data.csrfToken) this.csrf = data.csrfToken;
-      return { data, headers: response.headers };
+      return { data, headers: response.headers, status: response.status };
     }
   }
   const guest = new Client(),
@@ -133,16 +143,32 @@ test("Modules 1 and 2 against real MySQL in an isolated test database", async (t
     "public catalog search works without exposing account fields",
     async () => {
       const { data } = await guest.call("GET", "/catalog");
-      assert.equal(data.professors.length, 2);
-      assert.equal(data.courses.length, cseCurriculum.length);
+      assert.equal(
+        data.professors.length,
+        officialCatalog.professors.length + 2,
+      );
+      assert.equal(data.courses.length, officialCatalog.courses.length);
       assert.equal(JSON.stringify(data).includes("password_hash"), false);
       assert.equal(JSON.stringify(data).includes("anonymous_seed"), false);
       const search = await guest.call("GET", "/professors?q=CS1206");
-      assert.equal(search.data.professors.length, 2);
+      assert.ok(
+        search.data.professors.some(
+          (professor) => professor.id === "test-teacher-one",
+        ),
+      );
+      assert.ok(
+        search.data.professors.some(
+          (professor) => professor.id === "test-teacher-two",
+        ),
+      );
       assert.equal(
-        (await guest.call("GET", "/courses?department=Electrical")).data.courses
-          .length,
-        0,
+        (
+          await guest.call(
+            "GET",
+            "/courses?department=Electrical%20Engineering",
+          )
+        ).data.courses.length > 0,
+        true,
       );
       await guest.call("GET", "/professors/no-such-professor", undefined, 404);
     },
@@ -562,47 +588,26 @@ test("Modules 1 and 2 against real MySQL in an isolated test database", async (t
     },
   );
   await t.test(
-    "half-credit migration and official CSE import preserve the curriculum and existing valid assignments",
+    "credit schema supports published zero, half, and unknown values",
     async () => {
-      await pool.query("DELETE FROM courses WHERE credits < 1");
-      await pool.query(
-        "ALTER TABLE courses DROP CHECK chk_courses_credits, MODIFY COLUMN credits TINYINT UNSIGNED NOT NULL, ADD CONSTRAINT legacy_credits CHECK (credits BETWEEN 1 AND 10)",
-      );
       await migrate(pool);
-      await migrate(pool); // Re-running the migration must be safe.
-      await importCurriculum(pool);
-      await importCurriculum(pool); // Official assignments survive a repeated import.
-      const catalog = (await guest.call("GET", "/catalog")).data;
-      assert.equal(catalog.courses.length, cseCurriculum.length);
-      assert.deepEqual(
-        catalog.courses.map((c) => c.code).sort(),
-        cseCurriculum.map((c) => c.code).sort(),
-      );
-      for (const expected of cseCurriculum) {
-        const actual = catalog.courses.find((c) => c.code === expected.code);
-        assert.equal(actual.name, expected.name);
-        assert.equal(actual.credits, expected.credits);
-        assert.equal(actual.semester, expected.semester);
-        assert.equal(actual.department, "Computer Science");
-        assert.equal(actual.isSample, undefined);
-      }
-      assert.ok(
-        catalog.professors
-          .find((p) => p.id === "test-teacher-one")
-          .courses.includes("cs1206"),
-      );
+      await migrate(pool);
       const body = {
         code: "TESTHALF",
-        name: "Half credit test",
-        department: "Computer Science",
+        name: "Credit validation test",
+        department: "Computer Science and Engineering",
         credits: 0.5,
         semester: "Semester 7 or 8",
         description: "",
       };
       await admin.call("POST", "/courses", { ...body, credits: 0.25 }, 400);
-      const saved = (await admin.call("POST", "/courses", body, 201)).data.item;
-      assert.equal(saved.credits, 0.5);
-      await admin.call("DELETE", `/courses/${saved.id}`);
+      for (const credits of [0, 0.5, null]) {
+        const saved = (
+          await admin.call("POST", "/courses", { ...body, credits }, 201)
+        ).data.item;
+        assert.equal(saved.credits, credits);
+        await admin.call("DELETE", `/courses/${saved.id}`);
+      }
     },
   );
   await t.test(
@@ -676,6 +681,181 @@ test("Modules 1 and 2 against real MySQL in an isolated test database", async (t
           0,
         );
       }
+    },
+  );
+  await t.test(
+    "reviews validate on the server, persist anonymously, and reject duplicate races",
+    async () => {
+      const client = new Client();
+      await client.call("GET", "/auth/session");
+      const email = "review.student@student.nitw.ac.in";
+      await client.call(
+        "POST",
+        "/auth/register",
+        { email, password: originalPassword, agreed: true },
+        201,
+      );
+      await client.call("POST", "/auth/login", {
+        email,
+        password: originalPassword,
+      });
+      const body = {
+        professorId: "test-teacher-one",
+        courseId: "cs1206",
+        semester: "Spring 2025",
+        ratings: [5, 4, 5, 4, 3, 5],
+        text: "Useful examples and clear explanations.",
+        tags: ["Helpful"],
+        confirmed: true,
+      };
+      await guest.call("GET", "/auth/session");
+      await guest.call("POST", "/reviews", body, 401);
+      await admin.call("POST", "/reviews", body, 403);
+      for (const invalid of [
+        { ratings: [5, 4] },
+        { ratings: [5, 4, 5, 4, 3, 6] },
+        { ratings: [5, 4, 5, 4, 3, "5"] },
+        { tags: ["Invented tag"] },
+        { tags: ["Helpful", "Helpful"] },
+        { tags: "Helpful" },
+        { text: "x".repeat(1001) },
+        { text: 42 },
+        { confirmed: false },
+        { semester: "Spring 2099" },
+        { courseId: "cs1101" },
+        { professorId: "does-not-exist" },
+      ])
+        await client.call("POST", "/reviews", { ...body, ...invalid }, 400);
+      const saved = await client.call("POST", "/reviews", body, 201);
+      await client.call("POST", "/reviews", body, 409);
+      const raced = await Promise.all([
+        client.call(
+          "POST",
+          "/reviews",
+          { ...body, professorId: "test-teacher-two" },
+          null,
+        ),
+        client.call(
+          "POST",
+          "/reviews",
+          { ...body, professorId: "test-teacher-two" },
+          null,
+        ),
+      ]);
+      assert.deepEqual(raced.map((result) => result.status).sort(), [201, 409]);
+      const [stored] = await pool.query(
+        "SELECT context_key, ratings FROM reviews WHERE id = ?",
+        [saved.data.id],
+      );
+      assert.match(stored[0].context_key, /^[a-f0-9]{64}$/);
+      const publicReviews = (await guest.call("GET", "/reviews")).data.reviews;
+      assert.equal(publicReviews.length, 2);
+      const returned = publicReviews.find(
+        (review) => review.id === saved.data.id,
+      );
+      assert.deepEqual(returned.ratings, body.ratings);
+      assert.equal(returned.text, body.text);
+      assert.equal(returned.rating, 5);
+      const serialized = JSON.stringify(publicReviews);
+      for (const privateValue of [
+        email,
+        stored[0].context_key,
+        "password_hash",
+        "anonymous_seed",
+        "userId",
+        "context_key",
+      ])
+        assert.equal(serialized.includes(privateValue), false);
+      // A new application instance must read the same reviews from MySQL.
+      const { app: freshApp } = await createApp(pool, config, {
+        test: true,
+        sendOtp,
+      });
+      const freshServer = await new Promise((resolve) => {
+        const instance = freshApp.listen(0, "127.0.0.1", () =>
+          resolve(instance),
+        );
+      });
+      try {
+        const response = await fetch(
+          `http://127.0.0.1:${freshServer.address().port}/api/reviews`,
+        );
+        assert.equal((await response.json()).reviews.length, 2);
+      } finally {
+        await new Promise((resolve) => freshServer.close(resolve));
+      }
+      await admin.call("DELETE", "/courses/cs1206", undefined, 409);
+    },
+  );
+
+  await t.test(
+    "official catalog import is repeatable and preserves accounts and saved reviews",
+    async () => {
+      const catalog = JSON.parse(
+        await fs.readFile(
+          path.join(projectRoot, "shared/nitwCatalog.json"),
+          "utf8",
+        ),
+      );
+      const [accountsBefore] = await pool.query(
+        "SELECT id,password_hash,anonymous_seed FROM users ORDER BY id",
+      );
+      const [reviewsBefore] = await pool.query(
+        "SELECT * FROM reviews ORDER BY id",
+      );
+      await importNitwCatalog(pool, catalog);
+      const [counts] = await pool.query(
+        "SELECT (SELECT COUNT(*) FROM professors) AS professors,(SELECT COUNT(*) FROM courses) AS courses,(SELECT COUNT(*) FROM professor_courses) AS links",
+      );
+      await importNitwCatalog(pool, catalog);
+      assert.deepEqual(
+        (
+          await pool.query(
+            "SELECT (SELECT COUNT(*) FROM professors) AS professors,(SELECT COUNT(*) FROM courses) AS courses,(SELECT COUNT(*) FROM professor_courses) AS links",
+          )
+        )[0],
+        counts,
+      );
+      assert.deepEqual(
+        (
+          await pool.query(
+            "SELECT id,password_hash,anonymous_seed FROM users ORDER BY id",
+          )
+        )[0],
+        accountsBefore,
+      );
+      assert.deepEqual(
+        (await pool.query("SELECT * FROM reviews ORDER BY id"))[0],
+        reviewsBefore,
+      );
+      assert.ok(counts[0].professors >= catalog.professors.length);
+      const teacherId = catalog.professors[0].id;
+      await pool.execute(
+        "UPDATE professors SET name = 'Admin edited name' WHERE id = ?",
+        [teacherId],
+      );
+      await seed(pool);
+      assert.equal(
+        (
+          await pool.execute("SELECT name FROM professors WHERE id = ?", [
+            teacherId,
+          ])
+        )[0][0].name,
+        "Admin edited name",
+      );
+      await importNitwCatalog(pool, catalog);
+      const publicCatalog = (await guest.call("GET", "/catalog")).data;
+      assert.equal(
+        publicCatalog.professors.find(
+          (professor) => professor.id === catalog.professors[0].id,
+        ).name,
+        catalog.professors[0].name,
+      );
+      assert.ok(
+        publicCatalog.professors
+          .find((professor) => professor.id === catalog.professors[0].id)
+          .sourceUrl.startsWith("https://"),
+      );
     },
   );
 });

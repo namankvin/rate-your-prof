@@ -167,13 +167,18 @@ export async function createAuthService(pool, config, sendOtp) {
         "Password changed. Existing login sessions have been invalidated. Please log in again.",
     };
   }
-  async function reviewIdentity(userId, professorId, courseId) {
-    const [rows] = await pool.execute(
+  async function reviewIdentity(
+    userId,
+    professorId,
+    courseId,
+    connection = pool,
+  ) {
+    const [rows] = await connection.execute(
       "SELECT anonymous_seed FROM users WHERE id = ?",
       [userId],
     );
     requireValue(rows[0], "Account access required.", 403);
-    const [links] = await pool.execute(
+    const [links] = await connection.execute(
       "SELECT 1 FROM professor_courses WHERE professor_id = ? AND course_id = ?",
       [professorId, courseId],
     );

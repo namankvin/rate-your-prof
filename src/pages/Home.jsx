@@ -39,7 +39,11 @@ export default function Home() {
           </form>
           <div className="popular-searches">
             <span>Popular:</span>
-            {["Computer Science", "Mathematics", "Electrical"].map((d) => (
+            {[
+              "Computer Science and Engineering",
+              "Mathematics",
+              "Electrical Engineering",
+            ].map((d) => (
               <Link
                 key={d}
                 to={`/professors?department=${encodeURIComponent(d)}`}

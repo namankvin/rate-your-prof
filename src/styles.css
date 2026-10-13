@@ -2767,3 +2767,9 @@ td {
     scroll-behavior: auto !important;
   }
 }
+
+.directory-more {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+}

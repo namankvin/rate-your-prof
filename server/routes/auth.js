@@ -58,7 +58,7 @@ export function authRoutes(auth, config) {
       id(req.query.professorId),
       id(req.query.courseId),
     );
-    res.json({ eligible: true, reviewSubmissionImplemented: false });
+    res.json({ eligible: true, reviewSubmissionImplemented: true });
   });
   return router;
 }

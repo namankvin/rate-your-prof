@@ -7,7 +7,7 @@ import {
   EmptyState,
 } from "../components/UI.jsx";
 import Icon from "../components/Icon.jsx";
-import { ratingLabels, reviewTags } from "../data/formOptions.js";
+import { ratingLabels, reviewTags } from "../../shared/reviewOptions.js";
 import { request } from "../services/api.js";
 import { useData } from "../context/DataContext.jsx";
 
@@ -43,7 +43,7 @@ function StarInput({ label, value, onChange }) {
   );
 }
 export default function WriteReview({ params }) {
-  const { professors, courses, setReviews } = useData();
+  const { professors, courses, refreshCatalog } = useData();
   const requestedCourse = params.get("course");
   const [professorId, setProfessorId] = useState(
     params.get("professor") ||
@@ -52,7 +52,9 @@ export default function WriteReview({ params }) {
         : ""),
   );
   const [courseId, setCourseId] = useState(requestedCourse || "");
-  const [semester, setSemester] = useState("Autumn 2026");
+  const [semester, setSemester] = useState(
+    `${new Date().getMonth() < 6 ? "Spring" : "Autumn"} ${new Date().getFullYear()}`,
+  );
   const [ratings, setRatings] = useState([0, 0, 0, 0, 0, 0]);
   const [text, setText] = useState("");
   const [tags, setTags] = useState([]);
@@ -96,35 +98,28 @@ export default function WriteReview({ params }) {
     setBusy(true);
     setError("");
     try {
-      await request(
-        `/auth/review-eligibility?professorId=${encodeURIComponent(professorId)}&courseId=${encodeURIComponent(courseId)}`,
-      );
+      await request("/reviews", {
+        method: "POST",
+        body: {
+          professorId,
+          courseId,
+          semester,
+          ratings,
+          text,
+          tags,
+          confirmed,
+        },
+      });
+      setSubmitted(true);
+      await refreshCatalog();
+      window.scrollTo(0, 0);
     } catch (failure) {
       setError(failure.message);
+    } finally {
       setBusy(false);
-      return;
     }
-    const today = new Date();
-    setReviews((prev) => [
-      {
-        id: `preview-${Date.now()}`,
-        professorId,
-        courseId,
-        department: professor.department,
-        semester,
-        date: `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`,
-        rating: ratings[5],
-        ratings,
-        text: text.trim(),
-        tags,
-        helpful: 0,
-      },
-      ...prev,
-    ]);
-    setSubmitted(true);
-    setBusy(false);
-    window.scrollTo(0, 0);
   }
+
   if (submitted)
     return (
       <div className="container page narrow">
@@ -135,8 +130,8 @@ export default function WriteReview({ params }) {
           <div className="eyebrow">A PERSPECTIVE WORTH SHARING</div>
           <h1>Thanks for passing it on.</h1>
           <p>
-            Your demo review has been added to this preview. It will reset when
-            you refresh the browser.
+            Your anonymous review has been saved. Your account details are not
+            displayed with your review.
           </p>
           <Link
             className="button primary"
@@ -215,16 +210,23 @@ export default function WriteReview({ params }) {
                 value={semester}
                 onChange={(e) => setSemester(e.target.value)}
               >
-                {[
-                  "Autumn 2026",
-                  "Spring 2026",
-                  "Autumn 2025",
-                  "Spring 2025",
-                ].map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
+                {Array.from(
+                  { length: 4 },
+                  (_, offset) => new Date().getFullYear() - offset,
+                )
+                  .flatMap((year) => [`Autumn ${year}`, `Spring ${year}`])
+                  .map((s) => (
+                    <option key={s}>{s}</option>
+                  ))}
               </select>
             </label>
+            {professor && availableCourses.length === 0 && (
+              <p className="muted small">
+                No verified B.Tech teaching assignments are published for this
+                professor yet. An administrator can add an assignment when it is
+                confirmed.
+              </p>
+            )}
             {professor && (
               <div className="selected-professor">
                 <Avatar professor={professor} size="small-avatar" />
@@ -308,7 +310,7 @@ export default function WriteReview({ params }) {
               Shared as “Anonymous student”
             </span>
             <button type="submit" disabled={busy} className="button primary">
-              {busy ? "Checking account…" : "Preview review"}{" "}
+              {busy ? "Saving review…" : "Submit anonymous review"}{" "}
               <Icon name="arrow" size={17} />
             </button>
           </div>
@@ -344,9 +346,9 @@ export default function WriteReview({ params }) {
           <div className="preview-note">
             <Icon name="info" size={18} />
             <p>
-              <strong>Frontend preview</strong>Your signed-in account is checked
-              by the backend. This review is a temporary preview. Persistent
-              submissions and duplicate enforcement belong to Module 3.
+              <strong>One review per course and professor</strong>Your ratings
+              are saved anonymously. You can review each professor once for each
+              course they teach.
             </p>
           </div>
         </aside>

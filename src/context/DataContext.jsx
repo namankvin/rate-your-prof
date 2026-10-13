@@ -1,6 +1,19 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { request } from "../services/api.js";
 const DataContext = createContext(null);
+function withReviewSummary(records, reviews, field) {
+  return records.map((record) => {
+    const matches = reviews.filter((review) => review[field] === record.id);
+    return {
+      ...record,
+      reviewCount: matches.length,
+      rating: matches.length
+        ? matches.reduce((sum, review) => sum + review.rating, 0) /
+          matches.length
+        : null,
+    };
+  });
+}
 export function DataProvider({ children }) {
   const [professors, setProfessors] = useState([]),
     [courses, setCourses] = useState([]),
@@ -12,18 +25,15 @@ export function DataProvider({ children }) {
   async function refreshCatalog({ showLoading = false } = {}) {
     if (showLoading) setLoading(true);
     try {
-      const data = await request("/catalog");
+      const [data, reviewData] = await Promise.all([
+        request("/catalog"),
+        request("/reviews"),
+      ]);
       setProfessors(data.professors);
       setCourses(data.courses);
       setDepartmentRecords(data.departments);
       setError("");
-      setReviews((prev) =>
-        prev.filter(
-          (r) =>
-            data.professors.some((p) => p.id === r.professorId) &&
-            data.courses.some((c) => c.id === r.courseId),
-        ),
-      );
+      setReviews(reviewData.reviews);
     } catch (failure) {
       setError(failure.message);
       throw failure;
@@ -48,12 +58,11 @@ export function DataProvider({ children }) {
   return (
     <DataContext.Provider
       value={{
-        professors,
-        courses,
+        professors: withReviewSummary(professors, reviews, "professorId"),
+        courses: withReviewSummary(courses, reviews, "courseId"),
         departmentRecords,
         departments: departmentRecords.map((d) => d.name),
         reviews,
-        setReviews,
         reports,
         setReports,
         loading,

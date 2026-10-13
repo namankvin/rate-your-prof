@@ -1,15 +1,17 @@
--- Modules 1 and 2 only. Review data is still a frontend demonstration.
+-- Modules 1–3: catalog, accounts, sessions, and anonymous reviews.
 -- InnoDB supplies foreign keys, transactions, and row-level locking.
 CREATE TABLE IF NOT EXISTS departments (
   id VARCHAR(80) PRIMARY KEY,
   name VARCHAR(100) NOT NULL UNIQUE,
-  code VARCHAR(20) NOT NULL UNIQUE
+  code VARCHAR(20) NOT NULL UNIQUE,
+  source_url VARCHAR(512) NOT NULL DEFAULT ''
 ) ENGINE=InnoDB;
 CREATE TABLE IF NOT EXISTS professors (
   id VARCHAR(80) PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
   department_id VARCHAR(80) NOT NULL,
-  designation VARCHAR(50) NOT NULL,
+  designation VARCHAR(120) NOT NULL,
+  source_url VARCHAR(512) NOT NULL DEFAULT '',
   office VARCHAR(100) NOT NULL DEFAULT '',
   bio TEXT NOT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -20,14 +22,15 @@ CREATE TABLE IF NOT EXISTS professors (
 CREATE TABLE IF NOT EXISTS courses (
   id VARCHAR(80) PRIMARY KEY,
   code VARCHAR(20) NOT NULL UNIQUE,
+  source_url VARCHAR(512) NOT NULL DEFAULT '',
   name VARCHAR(100) NOT NULL,
   department_id VARCHAR(80) NOT NULL,
-  credits DECIMAL(3,1) UNSIGNED NOT NULL,
+  credits DECIMAL(3,1) UNSIGNED NULL,
   semester VARCHAR(20) NOT NULL,
   description TEXT NOT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE RESTRICT,
-  CONSTRAINT chk_courses_credits CHECK (credits BETWEEN 0.5 AND 10),
+  CONSTRAINT chk_courses_credits CHECK (credits BETWEEN 0 AND 10),
   INDEX idx_courses_department (department_id)
 ) ENGINE=InnoDB;
 CREATE TABLE IF NOT EXISTS professor_courses (
@@ -60,4 +63,20 @@ CREATE TABLE IF NOT EXISTS sessions (
   data JSON NOT NULL,
   expires_at BIGINT UNSIGNED NOT NULL,
   INDEX idx_sessions_expiry (expires_at)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS reviews (
+  id CHAR(36) PRIMARY KEY,
+  professor_id VARCHAR(80) NOT NULL,
+  course_id VARCHAR(80) NOT NULL,
+  context_key CHAR(64) NOT NULL UNIQUE,
+  semester VARCHAR(32) NOT NULL,
+  ratings JSON NOT NULL,
+  review_text VARCHAR(1000) NOT NULL DEFAULT '',
+  tags JSON NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (professor_id) REFERENCES professors(id) ON DELETE RESTRICT,
+  FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE RESTRICT,
+  INDEX idx_reviews_professor (professor_id),
+  INDEX idx_reviews_course (course_id)
 ) ENGINE=InnoDB;

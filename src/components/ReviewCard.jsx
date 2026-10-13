@@ -66,8 +66,8 @@ export default function ReviewCard({ review }) {
           onClick={() => setHelpful(!helpful)}
           aria-pressed={helpful}
         >
-          <Icon name="thumb" size={15} /> Helpful{" "}
-          <span>{review.helpful + (helpful ? 1 : 0)}</span>
+          <Icon name="thumb" size={15} /> Helpful (preview){" "}
+          <span>{helpful ? 1 : 0}</span>
         </button>
         <button
           className="report-button"

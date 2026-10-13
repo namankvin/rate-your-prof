@@ -1,13 +1,4 @@
-// Department options and review-form labels only.
-// Official course data lives in shared/cseCurriculum.js; no professors, reviews, or ratings are seeded.
-export const departments = [
-  "Computer Science",
-  "Electrical",
-  "Mechanical",
-  "Civil",
-  "Mathematics",
-  "Physics",
-];
+// Shared form options and server validation rules for Module 3.
 export const ratingLabels = [
   "Teaching Quality",
   "Clarity of Concepts",

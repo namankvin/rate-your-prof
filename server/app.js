@@ -10,6 +10,7 @@ import { errorHandler, HttpError } from "./lib/errors.js";
 import { loadUser, protectMutations } from "./middleware/auth.js";
 import { createAuthService } from "./services/auth.js";
 import { authRoutes } from "./routes/auth.js";
+import { reviewRoutes } from "./routes/reviews.js";
 import { catalogRoutes } from "./routes/catalog.js";
 
 export async function createApp(pool, config, options = {}) {
@@ -107,6 +108,7 @@ export async function createApp(pool, config, options = {}) {
   });
   app.use("/api/auth", authRoutes(auth, config));
   app.use("/api", catalogRoutes(pool));
+  app.use("/api", reviewRoutes(pool, auth, options));
   app.use("/api", (req, res) =>
     res.status(404).json({
       error: { message: "API endpoint not found.", code: "NOT_FOUND" },
